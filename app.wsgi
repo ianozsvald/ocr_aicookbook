@@ -4,6 +4,18 @@
 # VERY hacky bottle.py server for ocr.aicookbook.com
 # it'll read an image and return English and French text and mp3s
 
+# imagemagick convert commands to play with
+# convert to greyscale
+# convert img_6544744dbfc8cd6b594c7c69bbe9507c.tif -colorspace Gray out.tif
+# convert using linear adaptive thresholding
+# convert out.tif -lat 5x5 out2.tif # lots of speckling
+# 50x50 works better
+# 300x300 very good, cpu intensive
+
+# bw only
+# convert img_6544744dbfc8cd6b594c7c69bbe9507c.tif -monochrome out.tif
+
+
 import os
 import urllib
 import urllib2
@@ -44,7 +56,11 @@ def do_upload():
         im = Image.open(filename)
         im.save(filename_tif, 'TIFF')
         os.remove(filename)
-        return do_ocr(filename_tif, fileid)
+        text_english = do_ocr(filename_tif, fileid)
+        j = translate_text(text_english)
+        return j
+
+        #return do_ocr(filename_tif, fileid)
 
     return "Problem with image upload"
 
@@ -77,6 +93,12 @@ def static_file(filename):
     send_file(filename, root='/Users/ian/Documents/OpticalCharacterRecognition/ocr_aicookbook/data/')
 
 def do_ocr(filename_tif, fileid):
+    # the following clean-up doesn't seem to help...
+    #cmd = "convert %s -colorspace Gray %s" % (filename_tif, filename_tif)
+    #os.system(cmd)
+    #cmd = "convert %s -lat 300x300 %s" % (filename_tif, filename_tif)
+    #os.system(cmd) # this might take a while...
+
     cmd = 'tesseract %s %s -l eng' % (filename_tif, fileid)
     #print "---", cmd
     os.system(cmd) # awful approach, ought to use popen style
@@ -86,6 +108,29 @@ def do_ocr(filename_tif, fileid):
     text_english = " ".join([x.strip() for x in lines])
     os.remove(tesseract_result)
     return text_english
+
+def translate_text(text_english):
+    # escape, google translate, wrap with text to speech
+    escaped_english = text_english.replace(' ', '%20')
+    translate_fr = 'http://ajax.googleapis.com/ajax/services/language/translate?v=1.0&q=%s&langpair=en|fr' % (escaped_english)
+    text_french = ""
+    try:
+        translated_json = urllib2.urlopen(translate_fr).readlines()[0]
+        text_french = json.read(translated_json)['responseData']['translatedText']
+    except urllib2.HTTPError:
+        pass
+
+    # build dictionary of result, return to user
+    d = {}
+    d['text_english'] = text_english
+    d['text_french'] = text_french
+    tts_english = "http://translate.google.com/translate_tts?tl=en&q=%s" % (text_english.replace(' ','+'))
+    d['tts_english'] = tts_english
+    tts_french = "http://translate.google.com/translate_tts?tl=fr&q=%s" % (text_french.replace(' ','+'))
+    d['tts_french'] = tts_french
+    j = json.write(d)
+    return j
+
 
 @route('/do') # deprecated, kept for Emily's first app for now
 @route('/get_remote_img_and_translate')
@@ -102,26 +147,7 @@ def get_remote_and_translate():
 	if not os.path.exists(filename_tif):
             filename_tif = get_url(URL, fileid, filename_tif)
         text_english = do_ocr(filename_tif, fileid)
-
-        # escape, google translate, wrap with text to speech
-        escaped_english = text_english.replace(' ', '%20')
-	translate_fr = 'http://ajax.googleapis.com/ajax/services/language/translate?v=1.0&q=%s&langpair=en|fr' % (escaped_english)
-	text_french = ""
-	try:
-	    translated_json = urllib2.urlopen(translate_fr).readlines()[0]
-	    text_french = json.read(translated_json)['responseData']['translatedText']
-	except urllib2.HTTPError:
-	    pass
-
-        # build dictionary of result, return to user
-	d = {}
-	d['text_english'] = text_english
-	d['text_french'] = text_french
-	tts_english = "http://translate.google.com/translate_tts?tl=en&q=%s" % (text_english.replace(' ','+'))
-	d['tts_english'] = tts_english
-	tts_french = "http://translate.google.com/translate_tts?tl=fr&q=%s" % (text_french.replace(' ','+'))
-	d['tts_french'] = tts_french
-	j = json.write(d)
+        j = translate_text(text_english)
         return j
 
 
