@@ -17,7 +17,7 @@ if os.uname()[1].find('webfaction.com') > -1:
     os.chdir(os.path.dirname(__file__))
 
 import bottle
-from bottle import route, run, request
+from bottle import route, run, request, send_file
 
 def get_url(URL, fileid, filename_tif):
     """Retrieve URL, save as .tif file"""
@@ -69,9 +69,16 @@ def index():
     url = url + '<p><img src="http://farm2.static.flickr.com/1306/4701412966_7306b84cb5.jpg" alt="Test image" /></p>'
     return url
 
+@route('/static/:filename#.*#')
+def static_file(filename):
+    # sneaky way to see the processed file
+    # e.g. /static/img_71852c140cbee98a561ab5a83e40cd74.tif
+    # if you're running locally, you'll have the file name
+    send_file(filename, root='/Users/ian/Documents/OpticalCharacterRecognition/ocr_aicookbook/data/')
+
 def do_ocr(filename_tif, fileid):
     cmd = 'tesseract %s %s -l eng' % (filename_tif, fileid)
-    print "---", cmd
+    #print "---", cmd
     os.system(cmd) # awful approach, ought to use popen style
     tesseract_result = fileid+'.txt'
     input_file = open(tesseract_result)
