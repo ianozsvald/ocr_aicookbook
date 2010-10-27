@@ -12,7 +12,7 @@ import md5
 from PIL import Image
 import json
 # Change working directory so relative paths (and template lookup) work again
-if os.uname()[1].find('webfaction.com') == True:
+if os.uname()[1].find('webfaction.com') > -1:
     # need to play with path names to make it deploy remotely
     os.chdir(os.path.dirname(__file__))
 
@@ -45,7 +45,6 @@ def do_upload():
         im.save(filename_tif, 'TIFF')
         os.remove(filename)
         return do_ocr(filename_tif, fileid)
-        #return "Hello You uploaded %s (%d bytes)." % (filename, len(raw))
 
     return "Problem with image upload"
 
@@ -78,7 +77,6 @@ def do_ocr(filename_tif, fileid):
     input_file = open(tesseract_result)
     lines = input_file.readlines()
     text_english = " ".join([x.strip() for x in lines])
-    print "GOT ENGLISH"
     os.remove(tesseract_result)
     return text_english
 
